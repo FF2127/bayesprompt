@@ -1,14 +1,8 @@
 # BayesPrompt
 Code for the paper "BayesPrompt: Prompting Large-Scale Pre-Trained Language Models on Few-shot Inference via Debiased Domain Abstraction". 
-### Installation
-##### Create a virtual environment
+### Requirements
 
-```bash
-conda create -n bayesprompt python=3.8
-conda activate bayesprompt
-```
-##### Requirements
-
+- Python 3.8
 - numpy == 1.20.3
 - pandas == 1.3.4
 - pytorch_lightning == 1.3.1
@@ -18,11 +12,12 @@ conda activate bayesprompt
 - transformers == 4.7.0
 
 ### Getting Started
-##### An Example for SemEval
+##### An Example of SemEval
 
 ```bash
 bash scripts/semeval.sh
 ```
+We also provide other related data files for download on [Google Drive](https://drive.google.com/file/d/1F3upnwi84msO7mMd0xfARBvbXX-1Mr-h/view?usp=sharing).
 
 ### Acknowledgements
 
@@ -30,7 +25,7 @@ The code is based on [KnowPrompt](https://github.com/zjunlp/KnowPrompt) and [SVG
 
 
 ### Citation
-If you find this repo useful for your research, please cite the following paper: 
+If you find this repo useful for your research, please consider citing the following paper: 
 ```bash
 BayesPrompt: Prompting Large-Scale Pre-Trained Language Models on Few-shot Inference via Debiased Domain Abstraction
 ```
