@@ -10,8 +10,13 @@ Code for the paper "BayesPrompt: Prompting Large-Scale Pre-Trained Language Mode
 - scikit_learn == 0.24.2
 - torch == 1.10.1+cu111
 - transformers == 4.7.0
+- torchmetrics == 0.5.0
+- wandb == 0.13.11
 
 ### Getting Started
+
+For a quick start, we perform the GMM and SVGD operations in advance and store the results in the “updated_datasetname” folder. If you want to do this from scratch, please use "transformer_full.py".
+
 ##### An Example of SemEval
 
 ```bash
