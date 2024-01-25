@@ -4,7 +4,6 @@ import sys
 import torch
 import torch.nn as nn
 import numpy as np
-from pytorch_lightning.utilities.types import EPOCH_OUTPUT
 
 from .base import BaseLitModel
 from .util import f1_eval, compute_f1, acc, f1_score
@@ -42,7 +41,7 @@ class RobertaLitModel(BaseLitModel):
         # ignore the no_relation class to compute the f1 score
         self.eval_fn = partial(f1_score, rel_num=self.num_relation, na_num=Na_num)
         self.best_f1 = 0
-        self.label_st_id = tokenizer("[class1]", add_special_tokens=False)['input_ids'][0]
+        self.label_st_id = tokenizer("[class1]", add_special_tokens=False)['input_ids'][0]    #relation_type —— initial_id  50269
         self.tokenizer = tokenizer
         self._init_label_word()
         self.inputdata_reduced = []
@@ -79,7 +78,7 @@ class RobertaLitModel(BaseLitModel):
     def forward(self, x):
         return self.model(x)
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch, batch_idx):  # pylint: disable=unused-argument
         input_ids, attention_mask, labels, so = batch
 
         # # ============== save all data e.g. semeval.sh data_dir=dataset/semeval batchsize=1 ==============
@@ -91,23 +90,12 @@ class RobertaLitModel(BaseLitModel):
         #     sys.exit()
         # return None
 
-        # # ============== save updated data or normal ==============
-        # if self.current_epoch == 0:
-        #     # print("epoch==0: store input data")
-        #     self.store_inputdata(input_ids)
-        # else:
-        #     sys.exit()
-
-        # =============== after saving updated data: train ===============
-        # print("self.current_datasetname:", self.current_datasetname)
-        # print("self.current_datasetsplit:", self.current_datasetsplit)
-        # load updated data
-        data_document = 'updated_{}'.format(self.current_datasetname)
-        data_file = 'updated_{}_{}.txt'.format(self.current_datasetname, self.current_datasetsplit)
-        updated_data_filename = os.path.join(data_document, data_file)
-        # print("updated_data_filename:", updated_data_filename)
-        self.theta = np.loadtxt(updated_data_filename)
-        if self.current_epoch > 0:
+        # ============== normal ==============
+        if self.current_epoch == 0:
+            # print("epoch0: store input data")
+            self.store_inputdata(input_ids)
+        else:
+            # using updated_data
             self.add_sample_abstraction(input_ids)
         result = self.model(input_ids, attention_mask, return_dict=True, output_hidden_states=True)
         logits = result.logits
@@ -116,44 +104,38 @@ class RobertaLitModel(BaseLitModel):
         self.log("Train/loss", loss)
         return loss
 
-    # def training_epoch_end(self, outputs):
-    #     # # ============= save all data =============
-    #     # if self.current_epoch == 0:
-    #     #     # print("epoch==0 end: save all data as .txt")
-    #     #     save_alldata_reduced = torch.stack(self.alldata_reduced).detach().cpu()  # batchsize*1*1024
-    #     #     save_alldata_reduced = save_alldata_reduced.reshape(save_alldata_reduced.shape[0], -1)  # batchsize*1024
-    #     #     print("save_alldata_reduced:", save_alldata_reduced.shape)
-    #     #     # store save_alldata_reduced.txt
-    #     #     save_alldata_reduced_name = 'all_{}.txt'.format(self.current_datasetname)
-    #     #     np.savetxt(save_alldata_reduced_name, save_alldata_reduced.numpy(), delimiter=' ')
-    #     #     print("Success！")
-    #     #     sys.exit()
-    #
-    #     # # ============= save updated data or normal=============
-    #     if self.current_epoch == 0:
-    #         start_time = time.time()
-    #         print("epoch == 0 end: gmm fit all data")
-    #         all_train_data_name = "all_{}.txt".format(self.current_datasetname)
-    #         all_train_data_reduced = np.loadtxt(all_train_data_name)  # data_num*1024
-    #         print("all_train_data_reduced:", all_train_data_name, all_train_data_reduced.shape)  # 6507*1024
-    #         gmm_means, gmm_covariances, gmm_weights, gmm = self.get_gmm(all_train_data_reduced)
-    #         gradient_GMM = gmm_gradient(gmm_means, gmm_covariances, gmm_weights, gmm)
-    #         print("epoch == 0 end: process store_inputdata")
-    #         all_inputdata_reduced = torch.stack(self.inputdata_reduced).detach().cpu()
-    #         all_inputdata_reduced = all_inputdata_reduced.reshape(all_inputdata_reduced.shape[0], -1)  # current_date_num * 1024
-    #         print("all_inputdata_reduced:", all_inputdata_reduced.shape)
-    #         # updated particles ——> self.theta
-    #         self.theta = SVGD().update(all_inputdata_reduced.cuda(), gradient_GMM.dlnprob, n_iter=1000, stepsize=0.01)
-    #         print("self.theta:", self.theta.shape) # current_date_num * 1024
-    #
-    #         # store updated theta
-    #         updated_theta_filename = 'updated_{}_{}.txt'.format(self.current_datasetname, self.current_datasetsplit)
-    #         np.savetxt(updated_theta_filename, self.theta.detach().cpu().numpy(), delimiter=' ')
-    #         print("Success！")
-    #         end_time = time.time()
-    #         elapsed_time = end_time - start_time
-    #         print("The execution time of gmm_svgd is: ", elapsed_time, "s")
-    #         sys.exit()
+    def training_epoch_end(self, outputs):
+        # # ============= save all data =============
+        # if self.current_epoch == 0:
+        #     print("epoch==0 end: save all data as .txt")
+        #     save_alldata_reduced = torch.stack(self.alldata_reduced).detach().cpu()
+        #     save_alldata_reduced = save_alldata_reduced.reshape(save_alldata_reduced.shape[0], -1)
+        #     print("save_alldata_reduced:", save_alldata_reduced.shape)
+        #     # store save_alldata_reduced.txt
+        #     save_alldata_reduced_name = 'all_{}.txt'.format(self.current_datasetname)
+        #     np.savetxt(save_alldata_reduced_name, save_alldata_reduced.numpy(), delimiter=' ')
+        #     print("Success！")
+        #     sys.exit()
+
+        # ============== normal ==============
+        if self.current_epoch == 0:
+            start_time = time.time()
+            print("epoch0 end: gmm fit all data")
+            all_train_data_name = "all_{}.txt".format(self.current_datasetname)
+            all_train_data_reduced = np.loadtxt(all_train_data_name)  # data_num*1024
+            print("all_train_data_reduced:", all_train_data_name, all_train_data_reduced.shape)  # 6507*1024
+            gmm_means, gmm_covariances, gmm_weights, gmm = self.get_gmm(all_train_data_reduced)
+            gradient_GMM = gmm_gradient(gmm_means, gmm_covariances, gmm_weights, gmm)
+            print("epoch0 end: process store_inputdata")
+            all_inputdata_reduced = torch.stack(self.inputdata_reduced).detach().cpu()
+            all_inputdata_reduced = all_inputdata_reduced.reshape(all_inputdata_reduced.shape[0], -1)  # current_date_num * 1024
+            print("all_inputdata_reduced:", all_inputdata_reduced.shape)
+            # updated particles ——> self.theta
+            self.theta = SVGD().update(all_inputdata_reduced.cuda(), gradient_GMM.dlnprob, n_iter=1000, stepsize=0.01)
+            print("self.theta:", self.theta.shape) # current_date_num * 1024
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            print("The execution time of gmm_svgd is: ", elapsed_time, "s")
 
     def get_gmm(self, all_inputdata_reduced):
         gmm = GaussianMixture(n_components=min(all_inputdata_reduced.shape[0], self.num_relation), reg_covar=1e-1)
@@ -190,11 +172,11 @@ class RobertaLitModel(BaseLitModel):
                 word_embeddings.weight[so_word[1]] = sampled_data_avg
 
     def store_inputdata(self, input_ids):
-        word_embeddings = self.model.get_input_embeddings()  # roberta-large Embedding(50295, 1024)
+        word_embeddings = self.model.get_input_embeddings() # roberta-large Embedding(50295, 1024)
         avg_pool = nn.AvgPool1d(kernel_size=input_ids.shape[1])  # input_ids.shape[1]=input_embedding.shape[0]=256
         for i in range(input_ids.shape[0]):
-            input_embedding = word_embeddings.weight[input_ids[i]]  # 256*1024
-            self.inputdata_reduced.append(avg_pool(input_embedding.T).T)  # 1*1024
+            input_embedding = word_embeddings.weight[input_ids[i]] # 256*1024
+            self.inputdata_reduced.append(avg_pool(input_embedding.T).T) # 1*1024
 
     def store_alldata(self, input_ids):
         word_embeddings = self.model.get_input_embeddings()  # roberta-large Embedding(50295, 1024)
@@ -204,7 +186,7 @@ class RobertaLitModel(BaseLitModel):
             self.alldata_reduced.append(avg_pool(input_embedding.T).T)  # 1*1024
 
     def validation_step(self, batch, batch_idx):
-        input_ids, attention_mask, labels, entities = batch  # input_ids:[16,256]  attention_mask:[16,256]   labels:[16]  entities:[16,4]
+        input_ids, attention_mask, labels, entities = batch   #input_ids:[16,256]  attention_mask:[16,256]   labels:[16]  entities:[16,4]
         if self.current_epoch > 0:
             self.add_sample_abstraction(input_ids)
         logits = self.model(input_ids, attention_mask, return_dict=True).logits
@@ -212,7 +194,7 @@ class RobertaLitModel(BaseLitModel):
         loss = self.loss_fn(logits, labels)
         self.log("Eval/loss", loss)
         return {"eval_logits": logits.detach().cpu().numpy(), "eval_labels": labels.detach().cpu().numpy()}
-
+    
     def validation_epoch_end(self, outputs) -> None:
         logits = np.concatenate([o["eval_logits"] for o in outputs])
         labels = np.concatenate([o["eval_labels"] for o in outputs])
@@ -239,8 +221,8 @@ class RobertaLitModel(BaseLitModel):
 
     def pvp(self, logits, input_ids):
         # convert the [batch_size, seq_len, vocab_size] => [batch_size, num_labels]
-        # ! hard coded
-        _, mask_idx = (input_ids == self.tokenizer.mask_token_id).nonzero(as_tuple=True)  # mask_token_id:50264
+        #! hard coded
+        _, mask_idx = (input_ids == self.tokenizer.mask_token_id).nonzero(as_tuple=True)   #mask_token_id:50264
         bs = input_ids.shape[0]
         mask_output = logits[torch.arange(bs), mask_idx]
         assert mask_idx.shape[0] == bs, "only one mask in sequence!"
@@ -249,23 +231,21 @@ class RobertaLitModel(BaseLitModel):
 
     def configure_optimizers(self):
         no_decay_param = ["bias", "LayerNorm.weight"]
-        if not self.args.two_steps:
+        if not self.args.two_steps: 
             parameters = self.model.named_parameters()
         else:
             parameters = [next(self.model.named_parameters())]
         parameters = list(parameters)
         # only optimize the embedding parameters
         optimizer_group_parameters = [
-            {"params": [p for n, p in parameters if not any(nd in n for nd in no_decay_param)],
-             "weight_decay": self.args.weight_decay},
+            {"params": [p for n, p in parameters if not any(nd in n for nd in no_decay_param)], "weight_decay": self.args.weight_decay},
             {"params": [p for n, p in parameters if any(nd in n for nd in no_decay_param)], "weight_decay": 0}
         ]
         optimizer = self.optimizer_class(optimizer_group_parameters, lr=self.lr, eps=1e-8)
-        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=self.num_training_steps * 0.1,
-                                                    num_training_steps=self.num_training_steps)
+        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=self.num_training_steps * 0.1, num_training_steps=self.num_training_steps)
         return {
-            "optimizer": optimizer,
-            "lr_scheduler": {
+            "optimizer": optimizer, 
+            "lr_scheduler":{
                 'scheduler': scheduler,
                 'interval': 'step',  # or 'epoch'
                 'frequency': 1,
@@ -293,8 +273,7 @@ class gmm_gradient:
         P_x_p = P_x + epsilon
         for i in range(K):
             # dxlogMVN_x: g(x)~MVN，▽xlogP(x)=?
-            dxlogMVN_x = -torch.matmul((theta - self.means[i].view(1, self.means[i].shape[0])),
-                                       torch.inverse(self.covariances[i]))
+            dxlogMVN_x = -torch.matmul((theta - self.means[i].view(1, self.means[i].shape[0])), torch.inverse(self.covariances[i]))
             m = MultivariateNormal(self.means[i], self.covariances[i])
             pi_multi_gx_dev_px = self.weights[i] * torch.exp(m.log_prob(theta)) / P_x_p
             reshape_pi_multi_gx_dev_px = pi_multi_gx_dev_px.reshape((pi_multi_gx_dev_px.shape[0], -1))
@@ -304,19 +283,17 @@ class gmm_gradient:
 class SVGD():
     def __init__(self):
         pass
-
     def pairwise_distances(self, x):
         dot_product = torch.matmul(x, x.t())
         square_norm = dot_product.diag()
         distances = square_norm.unsqueeze(1) - 2.0 * dot_product + square_norm.unsqueeze(0)
         distances[distances < 0] = 0
         return distances
-
     def svgd_kernel(self, theta, h=-1):
         pairwise_dists = self.pairwise_distances(theta)
         if h < 0:  # if h < 0, using median trick
             h = torch.median(pairwise_dists)
-            h = torch.sqrt(0.5 * h / torch.log(torch.tensor([theta.shape[0] + 1.0]).cuda()))
+            h = torch.sqrt(0.5 * h / torch.log(torch.tensor([theta.shape[0]+1.0]).cuda()))
 
         # compute the rbf kernel
         Kxy = torch.exp(-pairwise_dists / h ** 2 / 2)
@@ -355,21 +332,20 @@ class SVGD():
             theta = theta + stepsize * adj_grad
         return theta
 
+
 class TransformerLitModelTwoSteps(RobertaLitModel):
     def configure_optimizers(self):
         no_decay_param = ["bais", "LayerNorm.weight"]
         parameters = list(self.model.named_parameters())
         optimizer_group_parameters = [
-            {"params": [p for n, p in parameters if not any(nd in n for nd in no_decay_param)],
-             "weight_decay": self.args.weight_decay},
+            {"params": [p for n, p in parameters if not any(nd in n for nd in no_decay_param)], "weight_decay": self.args.weight_decay},
             {"params": [p for n, p in parameters if any(nd in n for nd in no_decay_param)], "weight_decay": 0}
         ]
         optimizer = self.optimizer_class(optimizer_group_parameters, lr=self.args.lr_2, eps=1e-8)
-        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=self.num_training_steps * 0.1,
-                                                    num_training_steps=self.num_training_steps)
+        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=self.num_training_steps * 0.1, num_training_steps=self.num_training_steps)
         return {
             "optimizer": optimizer,
-            "lr_scheduler": {
+            "lr_scheduler":{
                 'scheduler': scheduler,
                 'interval': 'step',  # or 'epoch'
                 'frequency': 1,
