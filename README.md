@@ -32,5 +32,12 @@ The code is based on [KnowPrompt](https://github.com/zjunlp/KnowPrompt) and [SVG
 ### Citation
 If you find this repo useful for your research, please consider citing the following paper: 
 ```bash
-BayesPrompt: Prompting Large-Scale Pre-Trained Language Models on Few-shot Inference via Debiased Domain Abstraction
+@misc{li2024bayesprompt,
+      title={BayesPrompt: Prompting Large-Scale Pre-Trained Language Models on Few-shot Inference via Debiased Domain Abstraction}, 
+      author={Jiangmeng Li and Fei Song and Yifan Jin and Wenwen Qiang and Changwen Zheng and Fuchun Sun and Hui Xiong},
+      year={2024},
+      eprint={2401.14166},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
 ```
